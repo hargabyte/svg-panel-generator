@@ -28,8 +28,8 @@ export default function GeneratorPage() {
   const dropZoneRef = useRef<HTMLDivElement | null>(null);
 
   // Use string state for inputs to allow empty fields, parse to number for calculations
-  const [panelWidthMmRaw, setPanelWidthMmRaw] = useState('300');
-  const [panelHeightMmRaw, setPanelHeightMmRaw] = useState('300');
+  const [panelWidthMmRaw, setPanelWidthMmRaw] = useState('600');
+  const [panelHeightMmRaw, setPanelHeightMmRaw] = useState('600');
   const [artWidthMmRaw, setArtWidthMmRaw] = useState('50');   // SVG content width (auto-detected from files)
   const [artHeightMmRaw, setArtHeightMmRaw] = useState('50'); // SVG content height (auto-detected from files)
   const [aspectLocked, setAspectLocked] = useState(true);
