@@ -27,14 +27,24 @@ export default function GeneratorPage() {
   const [isDragging, setIsDragging] = useState(false);
   const dropZoneRef = useRef<HTMLDivElement | null>(null);
 
-  const [panelWidthMm, setPanelWidthMm] = useState(300);
-  const [panelHeightMm, setPanelHeightMm] = useState(300);
-  const [artWidthMm, setArtWidthMm] = useState(50);   // SVG content width (auto-detected from files)
-  const [artHeightMm, setArtHeightMm] = useState(50); // SVG content height (auto-detected from files)
+  // Use string state for inputs to allow empty fields, parse to number for calculations
+  const [panelWidthMmRaw, setPanelWidthMmRaw] = useState('300');
+  const [panelHeightMmRaw, setPanelHeightMmRaw] = useState('300');
+  const [artWidthMmRaw, setArtWidthMmRaw] = useState('50');   // SVG content width (auto-detected from files)
+  const [artHeightMmRaw, setArtHeightMmRaw] = useState('50'); // SVG content height (auto-detected from files)
   const [aspectLocked, setAspectLocked] = useState(true);
-  const [gutterMm, setGutterMm] = useState(0);
-  const [labelHeightMm, setLabelHeightMm] = useState(10);
-  const [paddingMm, setPaddingMm] = useState(0);
+  const [gutterMmRaw, setGutterMmRaw] = useState('0');
+  const [labelHeightMmRaw, setLabelHeightMmRaw] = useState('10');
+  const [paddingMmRaw, setPaddingMmRaw] = useState('0');
+
+  // Parse raw values to numbers (empty or invalid → 0)
+  const panelWidthMm = parseFloat(panelWidthMmRaw) || 0;
+  const panelHeightMm = parseFloat(panelHeightMmRaw) || 0;
+  const artWidthMm = parseFloat(artWidthMmRaw) || 0;
+  const artHeightMm = parseFloat(artHeightMmRaw) || 0;
+  const gutterMm = parseFloat(gutterMmRaw) || 0;
+  const labelHeightMm = parseFloat(labelHeightMmRaw) || 0;
+  const paddingMm = parseFloat(paddingMmRaw) || 0;
 
   // Store aspect ratio when dimensions change
   const aspectRatio = artWidthMm > 0 && artHeightMm > 0 ? artWidthMm / artHeightMm : 1;
@@ -43,23 +53,26 @@ export default function GeneratorPage() {
   const cellSizeMm = Math.max(artWidthMm, artHeightMm) + (paddingMm * 2) + labelHeightMm;
 
   // Handlers for art dimension changes with aspect lock
-  const handleArtWidthChange = (newWidth: number) => {
-    setArtWidthMm(newWidth);
-    if (aspectLocked && artWidthMm > 0) {
-      setArtHeightMm(Math.round((newWidth / aspectRatio) * 100) / 100);
+  const handleArtWidthChange = (rawValue: string) => {
+    setArtWidthMmRaw(rawValue);
+    const newWidth = parseFloat(rawValue) || 0;
+    if (aspectLocked && newWidth > 0 && aspectRatio > 0) {
+      setArtHeightMmRaw(String(Math.round((newWidth / aspectRatio) * 100) / 100));
     }
   };
 
-  const handleArtHeightChange = (newHeight: number) => {
-    setArtHeightMm(newHeight);
-    if (aspectLocked && artHeightMm > 0) {
-      setArtWidthMm(Math.round((newHeight * aspectRatio) * 100) / 100);
+  const handleArtHeightChange = (rawValue: string) => {
+    setArtHeightMmRaw(rawValue);
+    const newHeight = parseFloat(rawValue) || 0;
+    if (aspectLocked && newHeight > 0 && aspectRatio > 0) {
+      setArtWidthMmRaw(String(Math.round((newHeight * aspectRatio) * 100) / 100));
     }
   };
   const [showCellBorders, setShowCellBorders] = useState(true);
   const [removeOrnamentHole, setRemoveOrnamentHole] = useState(false);
   const [addRoundBacker, setAddRoundBacker] = useState(false);
-  const [roundBackerStrokeWidth, setRoundBackerStrokeWidth] = useState(0.5);
+  const [roundBackerStrokeWidthRaw, setRoundBackerStrokeWidthRaw] = useState('0.5');
+  const roundBackerStrokeWidth = parseFloat(roundBackerStrokeWidthRaw) || 0.5;
   // null = passthrough mode (show SVG exactly as-is with no modifications)
   const [layerSettings, setLayerSettings] = useState<LayerConfig[] | null>(null);
   const [layerPreset, setLayerPreset] = useState<'original' | 'inverted' | 'custom'>('original');
@@ -72,6 +85,8 @@ export default function GeneratorPage() {
   const [labelDepthByPath, setLabelDepthByPath] = useState<Record<string, 0 | 1>>({});
   const [labelOverrideByPath, setLabelOverrideByPath] = useState<Record<string, string>>({});
   const [fileNameColWidthPx, setFileNameColWidthPx] = useState(320);
+  const [isResizingCol, setIsResizingCol] = useState(false);
+  const resizeStartRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const [labelSource, setLabelSource] = useState<'parentFolder' | 'fileName'>(() => {
     try {
       const saved = localStorage.getItem('svgPanelGeneratorLabelSource');
@@ -179,8 +194,8 @@ export default function GeneratorPage() {
     if (result.files.length > 0 && result.files[0]) {
       const dims = await getSvgFileDimensions(result.files[0].file);
       if (dims && dims.width > 0 && dims.height > 0 && dims.width < 1000 && dims.height < 1000) {
-        setArtWidthMm(Math.round(dims.width * 100) / 100);
-        setArtHeightMm(Math.round(dims.height * 100) / 100);
+        setArtWidthMmRaw(String(Math.round(dims.width * 100) / 100));
+        setArtHeightMmRaw(String(Math.round(dims.height * 100) / 100));
       }
     }
   };
@@ -410,6 +425,40 @@ export default function GeneratorPage() {
     }));
   }, [selectedFiles, labelDepthByPath, labelOverrideByPath, labelSource]);
 
+  // Column resize handlers
+  const handleColResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizingCol(true);
+    resizeStartRef.current = { startX: e.clientX, startWidth: fileNameColWidthPx };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  useEffect(() => {
+    if (!isResizingCol) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!resizeStartRef.current) return;
+      const delta = e.clientX - resizeStartRef.current.startX;
+      const newWidth = Math.max(150, Math.min(600, resizeStartRef.current.startWidth + delta));
+      setFileNameColWidthPx(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingCol(false);
+      resizeStartRef.current = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizingCol]);
+
   return (
     <div
       className="min-h-screen bg-[var(--app-bg)] text-[var(--app-fg)]"
@@ -452,23 +501,6 @@ export default function GeneratorPage() {
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
                   />
                 </div>
-
-                <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
-                  <span className="whitespace-nowrap text-slate-600 dark:text-slate-400">Name width</span>
-                  <input
-                    type="range"
-                    min={220}
-                    max={520}
-                    step={10}
-                    value={fileNameColWidthPx}
-                    onChange={(e) => setFileNameColWidthPx(Number(e.target.value))}
-                    className="w-36 accent-indigo-500"
-                    aria-label="Adjust file name column width"
-                  />
-                  <span className="w-12 text-right tabular-nums text-slate-900 dark:text-slate-200">
-                    {fileNameColWidthPx}px
-                  </span>
-                </label>
 
                 <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
                   <span className="whitespace-nowrap font-semibold text-slate-700 dark:text-slate-300">LABEL:</span>
@@ -576,10 +608,16 @@ export default function GeneratorPage() {
                     <thead className="sticky top-0 bg-white dark:bg-slate-950">
                       <tr className="border-b border-slate-200 text-xs uppercase tracking-wider text-slate-600 dark:border-slate-800 dark:text-slate-400">
                         <th className="w-12 px-3 py-2">Pick</th>
-                        <th className="px-3 py-2" style={{ width: fileNameColWidthPx }}>
+                        <th className="relative px-3 py-2" style={{ width: fileNameColWidthPx }}>
                           File
+                          {/* Resize handle */}
+                          <div
+                            className="absolute right-0 top-0 h-full w-1 cursor-col-resize bg-transparent hover:bg-indigo-400 active:bg-indigo-500"
+                            onMouseDown={handleColResizeStart}
+                            title="Drag to resize column"
+                          />
                         </th>
-                        <th className="w-56 px-3 py-2">Label</th>
+                        <th className="px-3 py-2">Label</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -716,8 +754,8 @@ export default function GeneratorPage() {
                     <div className="flex items-center gap-1">
                       <input
                         type="number"
-                        value={panelWidthMm}
-                        onChange={(e) => setPanelWidthMm(Number(e.target.value))}
+                        value={panelWidthMmRaw}
+                        onChange={(e) => setPanelWidthMmRaw(e.target.value)}
                         className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-right text-sm tabular-nums text-slate-900 outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
                       />
                       <span className="text-xs text-slate-500 dark:text-slate-400">mm</span>
@@ -728,8 +766,8 @@ export default function GeneratorPage() {
                     <div className="flex items-center gap-1">
                       <input
                         type="number"
-                        value={panelHeightMm}
-                        onChange={(e) => setPanelHeightMm(Number(e.target.value))}
+                        value={panelHeightMmRaw}
+                        onChange={(e) => setPanelHeightMmRaw(e.target.value)}
                         className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-right text-sm tabular-nums text-slate-900 outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
                       />
                       <span className="text-xs text-slate-500 dark:text-slate-400">mm</span>
@@ -748,8 +786,8 @@ export default function GeneratorPage() {
                     <div className="flex items-center gap-1">
                       <input
                         type="number"
-                        value={artWidthMm}
-                        onChange={(e) => handleArtWidthChange(Number(e.target.value))}
+                        value={artWidthMmRaw}
+                        onChange={(e) => handleArtWidthChange(e.target.value)}
                         className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-right text-sm tabular-nums text-slate-900 outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
                       />
                       <span className="text-xs text-slate-500 dark:text-slate-400">mm</span>
@@ -785,8 +823,8 @@ export default function GeneratorPage() {
                     <div className="flex items-center gap-1">
                       <input
                         type="number"
-                        value={artHeightMm}
-                        onChange={(e) => handleArtHeightChange(Number(e.target.value))}
+                        value={artHeightMmRaw}
+                        onChange={(e) => handleArtHeightChange(e.target.value)}
                         className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-right text-sm tabular-nums text-slate-900 outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
                       />
                       <span className="text-xs text-slate-500 dark:text-slate-400">mm</span>
@@ -808,8 +846,8 @@ export default function GeneratorPage() {
                     <div className="flex items-center gap-1">
                       <input
                         type="number"
-                        value={gutterMm}
-                        onChange={(e) => setGutterMm(Number(e.target.value))}
+                        value={gutterMmRaw}
+                        onChange={(e) => setGutterMmRaw(e.target.value)}
                         className="w-16 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-right text-sm tabular-nums text-slate-900 outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
                       />
                       <span className="text-xs text-slate-500 dark:text-slate-400">mm</span>
@@ -823,8 +861,8 @@ export default function GeneratorPage() {
                     <div className="flex items-center gap-1">
                       <input
                         type="number"
-                        value={labelHeightMm}
-                        onChange={(e) => setLabelHeightMm(Number(e.target.value))}
+                        value={labelHeightMmRaw}
+                        onChange={(e) => setLabelHeightMmRaw(e.target.value)}
                         className="w-16 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-right text-sm tabular-nums text-slate-900 outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
                       />
                       <span className="text-xs text-slate-500 dark:text-slate-400">mm</span>
@@ -838,8 +876,8 @@ export default function GeneratorPage() {
                     <div className="flex items-center gap-1">
                       <input
                         type="number"
-                        value={paddingMm}
-                        onChange={(e) => setPaddingMm(Number(e.target.value))}
+                        value={paddingMmRaw}
+                        onChange={(e) => setPaddingMmRaw(e.target.value)}
                         className="w-16 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-right text-sm tabular-nums text-slate-900 outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
                       />
                       <span className="text-xs text-slate-500 dark:text-slate-400">mm</span>
@@ -893,8 +931,8 @@ export default function GeneratorPage() {
                       <span className="text-xs text-slate-600 dark:text-slate-400">Stroke width:</span>
                       <input
                         type="number"
-                        value={roundBackerStrokeWidth}
-                        onChange={(e) => setRoundBackerStrokeWidth(Number(e.target.value))}
+                        value={roundBackerStrokeWidthRaw}
+                        onChange={(e) => setRoundBackerStrokeWidthRaw(e.target.value)}
                         step={0.1}
                         min={0.1}
                         max={5}
