@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+/* App theme variables (default: light) */
+:root {
+  --app-bg: #fff8de;
+  --app-fg: #000000;
+}
+
+html.dark {
+  --app-bg: rgb(2 6 23); /* slate-950 */
+  --app-fg: rgb(226 232 240); /* slate-200 */
+}
+
+body {
+  margin: 0;
+  background: var(--app-bg);
+  color: var(--app-fg);
+}
+
+/* Compact numeric inputs (no spinner arrows) */
+input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Clamp long filenames to 2 lines (prevents the file list from forcing wide layouts) */
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  word-break: break-word;
+}
