@@ -193,9 +193,29 @@ export default function GeneratorPage() {
     // Measures actual content bounds and converts to mm at 72 DPI (Adobe/xTool standard)
     if (result.files.length > 0 && result.files[0]) {
       const dims = await getSvgFileDimensions(result.files[0].file);
-      if (dims && dims.width > 0 && dims.height > 0 && dims.width < 1000 && dims.height < 1000) {
-        setArtWidthMmRaw(String(Math.round(dims.width * 100) / 100));
-        setArtHeightMmRaw(String(Math.round(dims.height * 100) / 100));
+      if (dims && dims.width > 0 && dims.height > 0) {
+        const newArtWidth = Math.round(dims.width * 100) / 100;
+        const newArtHeight = Math.round(dims.height * 100) / 100;
+        setArtWidthMmRaw(String(newArtWidth));
+        setArtHeightMmRaw(String(newArtHeight));
+
+        // Calculate the minimum cell size needed for this art
+        // Cell size = max(artWidth, artHeight) + padding*2 + labelHeight
+        // Use current padding and label height values
+        const currentPadding = parseFloat(paddingMmRaw) || 0;
+        const currentLabelHeight = parseFloat(labelHeightMmRaw) || 0;
+        const minCellSize = Math.max(newArtWidth, newArtHeight) + (currentPadding * 2) + currentLabelHeight;
+
+        // If the art is too big for the current panel, scale up the panel
+        const currentPanelWidth = parseFloat(panelWidthMmRaw) || 0;
+        const currentPanelHeight = parseFloat(panelHeightMmRaw) || 0;
+
+        if (minCellSize > currentPanelWidth || minCellSize > currentPanelHeight) {
+          // Round up to a nice number (next 100mm increment)
+          const newPanelSize = Math.ceil(minCellSize / 100) * 100;
+          setPanelWidthMmRaw(String(newPanelSize));
+          setPanelHeightMmRaw(String(newPanelSize));
+        }
       }
     }
   };
